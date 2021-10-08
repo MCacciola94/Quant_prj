@@ -1,5 +1,6 @@
 #Import pkgs
 import sys
+import os
 
 #Pytorch pkgs
 import torch
@@ -22,14 +23,16 @@ LAMBS = [0.5]
 ALPHAS = [0.1]
 arch = "resnet20"
 dset = "Cifar10"
-epochs, finetuning_epochs = 150, 75
+epochs, finetuning_epochs = 6, 6
 batch_size = 128
 threshold = 1e-4
 momentum = 0.9
 weight_decay = 1e-4
-milestones_dict = {"emp1": [120, 200, 230, 250, 350, 400, 450]}
+milestones_dict = {"emp1": [120, 200, 230, 250, 350, 400, 450], "emp2": [35, 70, 105, 140, 175, 210, 245, 280, 315]}
 milestones = "emp1"
 evaluate = False
+save_every = 5
+print_freq = 10
 base_name = "V0.0.1-"
 ##############################################################
 
@@ -41,7 +44,7 @@ base_name = "V0.0.1-"
 for lr in LRS:
     for lamb in LAMBS:
         for alpha in ALPHAS:
-            
+
             name = (base_name + "_" + arch + "_" + dset + "_lr" + str(lr) + "_l" + str(lamb) + "_a" + 
                     str(alpha) + "_e" + str(epochs) + "+" + str(finetuning_epochs) + "_bs" + str(batch_size) +
                     "_t" + str(threshold) + "_m" + str(momentum) + "_wd" + str(weight_decay))
@@ -70,11 +73,12 @@ for lr in LRS:
 
             #Creating the perspective regualriation function
             #Compute M values for each layer using a trained model 
-            torch.save(model.state_dict(),"rand_init.ph")
+            torch.save(model.state_dict(),name + "rand_init.ph")
             base_checkpoint=torch.load("saves/save_"+arch+"_first_original/checkpoint.th")
             model.load_state_dict(base_checkpoint['state_dict'])
             M=at.layerwise_M(model) #a dictionary withe hte value of M for each layer of the model
-            model.load_state_dict(torch.load("rand_init.ph"))
+            model.load_state_dict(torch.load(name  + "rand_init.ph"))
+            os.remove(name + "rand_init.ph")
 
             print("M values:\n",M)
             
@@ -84,7 +88,11 @@ for lr in LRS:
 
 
             trainer = Trainer(model = model, dataset = dataset, reg = reg, lamb = lamb, threshold = threshold, 
-                                criterion =criterion, optimizer = optimizer, lr_scheduler = lr_scheduler, save_dir = save_dir)
+                                criterion =criterion, optimizer = optimizer, lr_scheduler = lr_scheduler, save_dir = save_dir, save_every = save_every, print_freq = print_freq)
+
+
+            if dset == "Imagenet":
+                trainer.top5_comp = True
 
             if evaluate:
                 trainer.validate()

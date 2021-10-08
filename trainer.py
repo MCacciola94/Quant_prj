@@ -16,7 +16,7 @@ import aux_tools as at
 
 class Trainer():
 
-    def __init__(self, model, dataset, reg, lamb, threshold, criterion, optimizer, lr_scheduler, save_dir, save_every = 25,  print_freq = 10):
+    def __init__(self, model, dataset, reg, lamb, threshold, criterion, optimizer, lr_scheduler, save_dir, save_every,  print_freq):
         self.model = model
         self.dataset = dataset
         self.reg = reg
@@ -33,6 +33,8 @@ class Trainer():
         self.save_dir = save_dir
         self.save_every = save_every
         self.print_freq = print_freq
+
+        self.top5_comp = False
         
 
 
@@ -188,6 +190,8 @@ class Trainer():
         data_time = AverageMeter()
         losses = AverageMeter()
         top1 = AverageMeter()
+        if self.top5_comp:
+            top5 = AverageMeter()
 
         # switch to train mode
         self.model.train()
@@ -219,23 +223,39 @@ class Trainer():
             loss = loss.float()
 
             # measure accuracy and record loss
-            prec1 = accuracy(output.data, target)[0]
+            if self.top5_comp:
+                prec1, prec5 = accuracy(output.data, target, topk = (1, 5))
+            else:
+                prec1 = accuracy(output.data, target)
+
             losses.update(loss.item(), input.size(0))
-            top1.update(prec1.item(), input.size(0))
+
+            top1.update(prec1[0].item(), input.size(0))
+            if self.top5_comp:
+                top5.update(prec5[0].item(), input.size(0))
+
 
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
-
-
             if i % self.print_freq == 0:
-                print('Epoch: [{0}][{1}/{2}]\t'
-                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                    'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                    'Loss {loss.val:.4f} ({loss.avg:.4f}) ([{lnrg:.3f}]+[{lrg:.3f}])\t'
-                    'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
-                        epoch, i, len(self.dataset["train_loader"]), batch_time = batch_time,
-                        data_time = data_time, loss = losses, lnrg = loss_noreg, lrg = regTerm, top1 = top1))
+                if self.top5_comp:
+                    print('Epoch: [{0}][{1}/{2}]\t'
+                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                        'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+                        'Loss {loss.val:.4f} ({loss.avg:.4f}) ([{lnrg:.3f}]+[{lrg:.3f}])\t'
+                        'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                        'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                            epoch, i, len(self.dataset["train_loader"]), batch_time = batch_time,
+                            data_time = data_time, loss = losses, lnrg = loss_noreg, lrg = regTerm, top1 = top1, top5 = top5))
+                else:
+                    print('Epoch: [{0}][{1}/{2}]\t'
+                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                        'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+                        'Loss {loss.val:.4f} ({loss.avg:.4f}) ([{lnrg:.3f}]+[{lrg:.3f}])\t'
+                        'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
+                            epoch, i, len(self.dataset["train_loader"]), batch_time = batch_time,
+                            data_time = data_time, loss = losses, lnrg = loss_noreg, lrg = regTerm, top1 = top1))
         
 
 
@@ -246,6 +266,8 @@ class Trainer():
         batch_time = AverageMeter()
         losses = AverageMeter()
         top1 = AverageMeter()
+        if self.top5_comp:
+            top5 = AverageMeter()
 
         # switch to evaluate mode
         self.model.eval()
@@ -271,24 +293,47 @@ class Trainer():
                 loss = loss.float()
 
                 # measure accuracy and record loss
-                prec1 = accuracy(output.data, target)[0]
+                if self.top5_comp:
+                    prec1, prec5 = accuracy(output.data, target, topk = (1, 5))
+                else:
+                    prec1 = accuracy(output.data, target)
+
                 losses.update(loss.item(), input.size(0))
-                top1.update(prec1.item(), input.size(0))
+
+                top1.update(prec1[0].item(), input.size(0))
+                if self.top5_comp:
+                    top5.update(prec5[0].item(), input.size(0))
+
+                
 
                 # measure elapsed time
                 batch_time.update(time.time() - end)
                 end = time.time()
                 
                 if i % self.print_freq == 0:
-                    print('Test: [{0}/{1}]\t'
-                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                        'Loss {loss.val:.4f} ({loss.avg:.4f}) ([{lnrg:.3f}]+[{lrg:.3f}])\t'
-                        'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
-                            i, len(self.dataset["valid_loader"]), batch_time=batch_time, loss=losses,lnrg=loss_noreg,lrg=regTerm,
-                            top1=top1))
+                    if self.top5_comp:
+                        print('Test: [{0}/{1}]\t'
+                            'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                            'Loss {loss.val:.4f} ({loss.avg:.4f}) ([{lnrg:.3f}]+[{lrg:.3f}])\t'
+                            'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                            'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                                i, len(self.dataset["valid_loader"]), batch_time = batch_time, loss = losses, lnrg=  loss_noreg, lrg = regTerm,
+                                top1 = top1, top5 = top5))
+                    else:
+                        print('Test: [{0}/{1}]\t'
+                            'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                            'Loss {loss.val:.4f} ({loss.avg:.4f}) ([{lnrg:.3f}]+[{lrg:.3f}])\t'
+                            'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
+                                i, len(self.dataset["valid_loader"]), batch_time = batch_time, loss = losses, lnrg = loss_noreg, lrg = regTerm,
+                                top1 = top1))
+        if self.top5_comp:
+            print(' * Prec@1 {top1.avg:.3f}\t'
+                'Prec@5 {top5.avg:.3f}'
+                .format(top1 = top1, top5 = top5))
+        else:
+            print(' * Prec@1 {top1.avg:.3f}'
+                .format(top1 = top1))
 
-        print(' * Prec@1 {top1.avg:.3f}'
-            .format(top1=top1))
 
         return top1.avg
 
@@ -318,19 +363,18 @@ class AverageMeter(object):
 
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
-    maxk = max(topk)
-    batch_size = target.size(0)
+    with torch.no_grad():
+        maxk = max(topk)
+        batch_size = target.size(0)
 
-    _, pred = output.topk(maxk, 1, True, True)
-    pred = pred.t()
-    correct = pred.eq(target.view(1, -1).expand_as(pred))
+        _, pred = output.topk(maxk, 1, True, True)
+        pred = pred.t()
+        correct = pred.eq(target.view(1, -1).expand_as(pred))
 
-    res = []
-    for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0)
-        res.append(correct_k.mul_(100.0 / batch_size))
-    return res
+        res = []
+        for k in topk:
+            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
+            res.append(correct_k.mul_(100.0 / batch_size))
+        return res
 
 
-if __name__ == '__main__':
-    main()
