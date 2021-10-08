@@ -13,14 +13,14 @@ available_arcs= model_names + ["resnet18", "resnet50"]
 def is_available(name):
     return name in available_arcs
 
-def load_arch(name, resume = "", already_pruned = True):
+def load_arch(name, num_classes, resume = "", already_pruned = True):
     if not(is_available(name)):
         print("Architecture requested not available")
         return None
 
 
     if name in model_names:
-        model = torch.nn.DataParallel(resnet.__dict__[name]())
+        model = torch.nn.DataParallel(resnet.__dict__[name](num_classes))
     else:
         model = models.__dict__[name]()
     model.cuda()

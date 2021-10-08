@@ -21,6 +21,9 @@ def load_dataset(name, batch_size, data_path = None):
 
     if name == "Cifar10":
         return cifar10_loader(batch_size)
+
+    if name == "Cifar100":
+        return cifar100_loader(batch_size)
     
     if name == "Imagenet":
         if data_path is None:
@@ -52,6 +55,40 @@ def cifar10_loader(batch_size):
         num_workers = 4, pin_memory = True)
         
     return {"train_loader": train_loader, "valid_loader": val_loader}
+
+
+
+
+
+def cifar100_loader(batch_size):
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                        std=[0.229, 0.224, 0.225])
+
+    train_loader = torch.utils.data.DataLoader(
+        datasets.CIFAR100(root='./data', train=True, transform = transforms.Compose([
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomCrop(32, 4),
+            transforms.ToTensor(),
+            normalize,
+        ]), download = True),
+        batch_size = batch_size, shuffle = True,
+        num_workers = 4, pin_memory = True)
+
+    val_loader = torch.utils.data.DataLoader(
+        datasets.CIFAR100(root='./data', train = False, transform = transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+        ])),
+        batch_size = 128, shuffle = False,
+        num_workers = 4, pin_memory = True)
+        
+    return {"train_loader": train_loader, "valid_loader": val_loader}
+
+
+
+
+
+
 
 
 def imagenet_loader(batch_size, data_path):
