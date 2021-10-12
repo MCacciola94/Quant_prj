@@ -18,7 +18,6 @@ def load_arch(name, num_classes, resume = "", already_pruned = True):
         print("Architecture requested not available")
         return None
 
-
     if name in model_names:
         model = torch.nn.DataParallel(resnet.__dict__[name](num_classes))
     else:

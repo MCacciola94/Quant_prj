@@ -1,0 +1,2 @@
+lr	lambda	alpha	epochs	batch_size	threshold	momentum	weight_decay	Final_Accuracy	Sparsity	Tot_time	Pr_time	Accuracy	Train_Loss
+0.01	0.4	0.0001	

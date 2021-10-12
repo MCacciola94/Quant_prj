@@ -19,8 +19,10 @@ from trainer import Trainer
 
 
 ##########################################################################################
-milestones_dict = {"emp1": [120, 200, 230, 250, 350, 400, 450], 
-                    "emp2": [35, 70, 105, 140, 175, 210, 245, 280, 315]}
+milestones_dict = {"emp1": [120, 200, 230, 250, 350, 400, 450], #resnet56 on Cifar10 resnet56 on cifar100
+                    "emp2": [35, 70, 105, 140, 175, 210, 245, 280, 315],
+                    "emp3": [100, 250, 350, 400, 450], #resnet20 on Cifar10
+                    "emp4": [200, 250, 350, 400, 450]} #resnet20 on Cifar100
 
 parser = argparse.ArgumentParser(description='Pruning using SPR term')
 parser.add_argument('--config', '-c',
@@ -67,7 +69,7 @@ class Grid_Search():
 
                     name = (base_name + "_" + arch + "_" + dset + "_lr" + str(lr) + "_l" + str(lamb) + "_a" + 
                             str(alpha) + "_e" + str(epochs) + "+" + str(finetuning_epochs) + "_bs" + str(batch_size) +
-                            "_t" + str(threshold) + "_m" + str(momentum) + "_wd" + str(weight_decay))
+                            "_t" + str(threshold) + "_m" + str(momentum) + "_wd" + str(weight_decay))# + "_mlst" + milestones)
 
                     save_dir = "saves/save_" + name
                     log_file = open("temp_logs/" + name, "w")
@@ -79,7 +81,7 @@ class Grid_Search():
                     elif dset == "Cifar100": num_classes = 100
                     elif dset == "Imagenet": num_classes = 1000
 
-                    model=archs.load_arch(arch, num_classes)
+                    model = archs.load_arch(arch, num_classes)
                     dataset = dl.load_dataset(dset, batch_size)
 
 
