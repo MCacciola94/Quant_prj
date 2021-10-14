@@ -19,10 +19,10 @@ from trainer import Trainer
 
 
 ##########################################################################################
-milestones_dict = {"emp1": [120, 200, 230, 250, 350, 400, 450], #resnet56 on Cifar10 resnet56 on cifar100
+milestones_dict = {"emp1": [120, 200, 230, 250, 350, 400, 450], 
                     "emp2": [35, 70, 105, 140, 175, 210, 245, 280, 315],
-                    "emp3": [100, 250, 350, 400, 450], #resnet20 on Cifar10
-                    "emp4": [200, 250, 350, 400, 450]} #resnet20 on Cifar100
+                    "emp3": [100, 250, 350, 400, 450], 
+                    "emp4": [200, 250, 350, 400, 450]} 
 
 parser = argparse.ArgumentParser(description='Pruning using SPR term')
 parser.add_argument('--config', '-c',
@@ -41,22 +41,23 @@ class Grid_Search():
             #Parameters setting
         ##############################################################
         cudnn.benchmark = True
-        LRS = to_list_of_float(conf.get("conf1", "LRS"))
-        LAMBS = to_list_of_float(conf.get("conf1", "LAMBS"))
-        ALPHAS = to_list_of_float(conf.get("conf1", "ALPHAS"))
-        arch = conf.get("conf1", "arch")
-        dset = conf.get("conf1", "dset")
-        epochs = conf.getint("conf1", "epochs")
-        finetuning_epochs = conf.getint("conf1", "finetuning_epochs")
-        batch_size = conf.getint("conf1", "batch_size")
-        threshold = conf.getfloat("conf1", "threshold")
-        momentum = conf.getfloat("conf1", "momentum")
-        weight_decay = conf.getfloat("conf1", "weight_decay")
-        milestones = conf.get("conf1", "milestones")
-        evaluate = conf.getboolean("conf1", "evaluate")
-        save_every = conf.getint("conf1", "save_every")
-        print_freq = conf.getint("conf1", "print_freq")
-        base_name = conf.get("conf1", "base_name")
+        conf1 = conf["conf1"]
+        LRS = to_list_of_float(conf1.get("LRS"))
+        LAMBS = to_list_of_float(conf1.get("LAMBS"))
+        ALPHAS = to_list_of_float(conf1.get("ALPHAS"))
+        arch = conf1.get("arch")
+        dset = conf1.get("dset")
+        epochs = conf1.getint("epochs")
+        finetuning_epochs = conf1.getint("finetuning_epochs")
+        batch_size = conf1.getint("batch_size")
+        threshold = conf1.getfloat("threshold")
+        momentum = conf1.getfloat("momentum")
+        weight_decay = conf1.getfloat("weight_decay")
+        milestones = conf1.get("milestones")
+        evaluate = conf1.getboolean("evaluate", "False")
+        save_every = conf1.getint("save_every", str((epochs+finetuning_epochs)*0.2))
+        print_freq = conf1.getint("print_freq", "100")
+        base_name = conf1.get("base_name")
         ##############################################################
 
         ################################################################
@@ -69,7 +70,7 @@ class Grid_Search():
 
                     name = (base_name + "_" + arch + "_" + dset + "_lr" + str(lr) + "_l" + str(lamb) + "_a" + 
                             str(alpha) + "_e" + str(epochs) + "+" + str(finetuning_epochs) + "_bs" + str(batch_size) +
-                            "_t" + str(threshold) + "_m" + str(momentum) + "_wd" + str(weight_decay))# + "_mlst" + milestones)
+                            "_t" + str(threshold) + "_m" + str(momentum) + "_wd" + str(weight_decay) + "_mlst" + milestones)
 
                     save_dir = "saves/save_" + name
                     log_file = open("temp_logs/" + name, "w")
