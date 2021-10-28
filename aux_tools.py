@@ -114,7 +114,7 @@ def maxVal(model):
     return out
 
 
-def layerwise_M(model,const=False):
+def layerwise_M(model, const = False, scale = 1.0):
        Mdict={}
        if const:
            for m in model.modules():
@@ -123,7 +123,7 @@ def layerwise_M(model,const=False):
        else:
             for m in model.modules():
                 if isinstance(m,nn.Conv2d) or isinstance(m,nn.Linear):
-                    Mdict[m]=torch.norm(m.weight,p=np.inf).item()
+                    Mdict[m]=torch.norm(m.weight,p=np.inf).item() * scale
 
        return Mdict
 

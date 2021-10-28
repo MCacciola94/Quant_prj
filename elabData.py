@@ -4,7 +4,7 @@ import pandas as pd
 
 ########################################################################################
 param_dict= {"lr": "lr", "lambda": "l", "alpha": "a", "epochs": "e", "batch_size": "bs",
-             "threshold": "t", "momentum": "m", "weight_decay": "wd"}
+             "threshold": "t", "momentum": "m", "weight_decay": "wd", "M_scale": "Mscl"}
 ########################################################################################
 
 def create_csv(path = "logs/resnet20"):
