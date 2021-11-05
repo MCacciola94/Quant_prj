@@ -22,7 +22,8 @@ from trainer import Trainer
 milestones_dict = {"emp1": [120, 200, 230, 250, 350, 400, 450], 
                     "emp2": [35, 70, 105, 140, 175, 210, 245, 280, 315],
                     "emp3": [100, 250, 350, 400, 450], 
-                    "emp4": [200, 250, 350, 400, 450]} 
+                    "emp4": [200, 250, 350, 400, 450],
+                    "emp5": [200, 400]} 
 
 parser = argparse.ArgumentParser(description='Pruning using SPR term')
 parser.add_argument('--config', '-c',
