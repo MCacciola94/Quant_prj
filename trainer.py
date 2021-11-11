@@ -57,6 +57,12 @@ class Trainer():
             # remember best prec@1 and save checkpoint
             is_best = prec1 > self.best_prec1
             self.best_prec1 = max(prec1, self.best_prec1)
+            if is_best:
+                save_checkpoint({
+                    'epoch': epoch + 1,
+                    'state_dict': self.model.state_dict(),
+                    'best_prec1': self.best_prec1,
+                }, is_best, filename=os.path.join(self.save_dir, 'checkpoint_best.th'))
 
             
             if epoch > 0 and epoch % self.save_every == 0:
@@ -66,10 +72,10 @@ class Trainer():
                     'best_prec1': self.best_prec1,
                 }, is_best, filename=os.path.join(self.save_dir, 'checkpoint.th'))
 
-            save_checkpoint({
-                'state_dict': self.model.state_dict(),
-                'best_prec1': self.best_prec1,
-            }, is_best, filename=os.path.join(self.save_dir, 'model.th'))
+            # save_checkpoint({
+            #     'state_dict': self.model.state_dict(),
+            #     'best_prec1': self.best_prec1,
+            # }, is_best, filename=os.path.join(self.save_dir, 'model.th'))
 
 
         print("\n Elapsed time for training ", datetime.now()-start)
