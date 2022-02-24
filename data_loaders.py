@@ -37,7 +37,7 @@ def cifar10_loader(batch_size):
                                         std=[0.229, 0.224, 0.225])
 
     train_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR10(root='./data', train=True, transform = transforms.Compose([
+        datasets.CIFAR10(root='../dataset', train=True, transform = transforms.Compose([
             transforms.RandomHorizontalFlip(),
             transforms.RandomCrop(32, 4),
             transforms.ToTensor(),
@@ -47,7 +47,7 @@ def cifar10_loader(batch_size):
         num_workers = 4, pin_memory = True)
 
     val_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR10(root='./data', train = False, transform = transforms.Compose([
+        datasets.CIFAR10(root='../dataset', train = False, transform = transforms.Compose([
             transforms.ToTensor(),
             normalize,
         ])),
@@ -65,7 +65,7 @@ def cifar100_loader(batch_size):
                                         std=[0.229, 0.224, 0.225])
 
     train_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR100(root='./data', train=True, transform = transforms.Compose([
+        datasets.CIFAR100(root='../dataset', train=True, transform = transforms.Compose([
             transforms.RandomHorizontalFlip(),
             transforms.RandomCrop(32, 4),
             transforms.ToTensor(),
@@ -75,7 +75,7 @@ def cifar100_loader(batch_size):
         num_workers = 4, pin_memory = True)
 
     val_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR100(root='./data', train = False, transform = transforms.Compose([
+        datasets.CIFAR100(root='../dataset', train = False, transform = transforms.Compose([
             transforms.ToTensor(),
             normalize,
         ])),

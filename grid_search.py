@@ -12,7 +12,7 @@ from torch.nn.utils import prune
 
 #My pkgs
 import aux_tools as at
-import perspReg as pReg
+import quantPerspReg as qPReg
 import architectures as archs
 import data_loaders as dl
 from trainer import Trainer
@@ -23,9 +23,13 @@ milestones_dict = {"emp1": [120, 200, 230, 250, 350, 400, 450],
                     "emp2": [35, 70, 105, 140, 175, 210, 245, 280, 315],
                     "emp3": [100, 250, 350, 400, 450], 
                     "emp4": [200, 250, 350, 400, 450],
-                    "emp5": [200, 400]} 
+                    "emp5": [200, 400],
+                    "emp6": [120, 200, 250, 350, 400, 450],
+                    "emp7": [200,290],
+                    "empweird": [1,2,3,4]
+                    } 
 
-parser = argparse.ArgumentParser(description='Pruning using SPR term')
+parser = argparse.ArgumentParser(description='Quantizing using SPR term')
 parser.add_argument('--config', '-c',
                     help="Name of the configuration file")
 ############################################################################################
@@ -45,7 +49,7 @@ class Grid_Search():
         conf1 = conf["conf1"]
         LRS = to_list_of_float(conf1.get("LRS"))
         LAMBS = to_list_of_float(conf1.get("LAMBS"))
-        ALPHAS = to_list_of_float(conf1.get("ALPHAS"))
+        GAMMAS = to_list_of_float(conf1.get("GAMMAS"))
         arch = conf1.get("arch")
         dset = conf1.get("dset")
         epochs = conf1.getint("epochs")
@@ -68,67 +72,69 @@ class Grid_Search():
 
         for lr in LRS:
             for lamb in LAMBS:
-                for alpha in ALPHAS:
+                    for gamma in GAMMAS:
 
-                    name = (base_name + "_" + arch + "_" + dset + "_lr" + str(lr) + "_l" + str(lamb) + "_a" + 
-                            str(alpha) + "_e" + str(epochs) + "+" + str(finetuning_epochs) + "_bs" + str(batch_size) +
-                            "_t" + str(threshold) + "_m" + str(momentum) + "_wd" + str(weight_decay) + "_mlst" + milestones + "_Mscl" + str(M_scale))
+                        name = (base_name + "_" + arch + "_" + dset + "_lr" + str(lr) + "_l" + str(lamb) +"_g" + str(gamma) + "_e" + str(epochs) + "+" + str(finetuning_epochs) + "_bs" + str(batch_size) +
+                                "_t" + str(threshold) + "_m" + str(momentum) + "_wd" + str(weight_decay) + "_mlst" + milestones + "_Mscl" + str(M_scale))
 
-                    save_dir = "saves/save_" + name
-                    log_file = open("temp_logs/" + name, "w")
-                    sys.stdout = log_file
-                    sys.stderr = sys.stdout
-                    print(name)
-                    
-                    if dset == "Cifar10": num_classes = 10
-                    elif dset == "Cifar100": num_classes = 100
-                    elif dset == "Imagenet": num_classes = 1000
+                        save_dir = "saves/save_" + name
+                        log_file = open("temp_logs/" + name, "w")
+                        sys.stdout = log_file
+                        sys.stderr = sys.stdout
+                        print(name)
+                        
+                        if dset == "Cifar10": num_classes = 10
+                        elif dset == "Cifar100": num_classes = 100
+                        elif dset == "Imagenet": num_classes = 1000
 
-                    model = archs.load_arch(arch, num_classes)
-                    dataset = dl.load_dataset(dset, batch_size)
-
-
-                    # define loss function (criterion) and optimizer
-                    criterion = nn.CrossEntropyLoss().cuda()
+                        model = archs.load_arch(arch, num_classes)
+                        dataset = dl.load_dataset(dset, batch_size)
 
 
-                    optimizer = torch.optim.SGD(model.parameters(), lr,
-                                                momentum=momentum,
-                                                weight_decay=weight_decay)
-
-                    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
-                                                                        milestones=milestones_dict[milestones], last_epoch= - 1)
+                        # define loss function (criterion) and optimizer
+                        criterion = nn.CrossEntropyLoss().cuda()
 
 
-                    #Creating the perspective regualriation function
-                    #Compute M values for each layer using a trained model 
-                    torch.save(model.state_dict(),name + "rand_init.ph")
-                    base_checkpoint=torch.load("saves/save_" + arch + "_" + dset + "_first_original/checkpoint.th")
-                    model.load_state_dict(base_checkpoint['state_dict'])
-                    M=at.layerwise_M(model, scale = M_scale) #a dictionary withe hte value of M for each layer of the model
-                    model.load_state_dict(torch.load(name  + "rand_init.ph"))
-                    os.remove(name + "rand_init.ph")
+                        optimizer = torch.optim.SGD(model.parameters(), lr,
+                                                    momentum=momentum,
+                                                    weight_decay=weight_decay)
 
-                    print("M values:\n",M)
-                    
-                    reg = (pReg.myTools(alpha=alpha,M=M)).myReg 
+                        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
+                                                                            milestones=milestones_dict[milestones], last_epoch= - 1)
 
 
+                        #Creating the perspective regualriation function
+                        #Compute M values for each layer using a trained model 
+                        torch.save(model.state_dict(),name + "rand_init.ph")
+                        base_checkpoint=torch.load("saves/save_" + arch + "_" + dset + "_first_original/checkpoint.th")
+                        model.load_state_dict(base_checkpoint['state_dict'])
+                        M=at.layerwise_M(model, scale = M_scale) #a dictionary withe hte value of M for each layer of the model
+                        model.load_state_dict(torch.load(name  + "rand_init.ph"))
+                        os.remove(name + "rand_init.ph")
+
+                        print("M values:\n",M)
+
+                        
+                        alphas = at.layerwise_alpha(model, const =False, scale  = 0.001)
+                        print("Alpha values:\n",alphas)
+                        reg = (qPReg.myTools(alphas=alphas,M=M)).myReg 
 
 
-                    trainer = Trainer(model = model, dataset = dataset, reg = reg, lamb = lamb, threshold = threshold, 
-                                        criterion =criterion, optimizer = optimizer, lr_scheduler = lr_scheduler, save_dir = save_dir, save_every = save_every, print_freq = print_freq)
 
 
-                    if dset == "Imagenet":
-                        trainer.top5_comp = True
+                        trainer = Trainer(model = model, dataset = dataset, reg = reg, lamb = lamb, alphas = alphas, gamma = gamma, threshold = threshold, 
+                                            criterion =criterion, optimizer = optimizer, lr_scheduler = lr_scheduler, save_dir = save_dir, save_every = save_every, print_freq = print_freq)
 
-                    if evaluate:
-                        trainer.validate()
-                    else:
-                        trainer.train(epochs, finetuning_epochs)
 
-                    log_file.close()
+                        if dset == "Imagenet":
+                            trainer.top5_comp = True
+
+                        if evaluate:
+                            trainer.validate()
+                        else:
+                            trainer.train(epochs, finetuning_epochs)
+
+                        log_file.close()
                     
                     
 def to_list_of_float(list_string, sep = ","):

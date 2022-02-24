@@ -16,11 +16,13 @@ import aux_tools as at
 
 class Trainer():
 
-    def __init__(self, model, dataset, reg, lamb, threshold, criterion, optimizer, lr_scheduler, save_dir, save_every,  print_freq):
+    def __init__(self, model, dataset, reg, lamb, alphas, gamma, threshold, criterion, optimizer, lr_scheduler, save_dir, save_every,  print_freq):
         self.model = model
         self.dataset = dataset
         self.reg = reg
         self.lamb = lamb
+        self.gamma = gamma
+        self.alphas = alphas
         self.threshold = threshold
         self.criterion = criterion
         self.optimizer = optimizer
@@ -72,44 +74,24 @@ class Trainer():
                     'best_prec1': self.best_prec1,
                 }, is_best, filename=os.path.join(self.save_dir, 'checkpoint.th'))
 
-            # save_checkpoint({
-            #     'state_dict': self.model.state_dict(),
-            #     'best_prec1': self.best_prec1,
-            # }, is_best, filename=os.path.join(self.save_dir, 'model.th'))
 
 
         print("\n Elapsed time for training ", datetime.now()-start)
 
 
-        spars, tot_p = at.sparsityRate(self.model)
-        # i=0
-        # while i < len(spars):
-        #     print("\n Percentage of pruned entities ", (np.array(spars[i])==1).sum()/np.array(spars[i]).size, "total entities in this layer", np.array(spars[i]).size)
-        #     i=i+1
-        print("Total parameter pruned:", tot_p[0], "(unstructured)", tot_p[1], "(structured)")
-
-        at.maxVal(self.model)   
+        quantW, quantLayer = at.quantRate(self.model, self.alphas)
+ 
+        print("Quant rate: ", quantW, " Layerwise: ", quantLayer)
 
 
-        # Pruning parameters under the threshold
-        for m in self.model.modules(): 
-            if hasattr(m, 'weight'):
-                pruning_par=[((m,'weight'))]
 
-                if hasattr(m, 'bias') and not(m.bias==None):
-                        pruning_par.append((m,'bias'))
+        # Quantizing parameters under the threshold
+        at.quantThresholding(self.model, self.alphas, self.threshold)
 
-                
-                prune.global_unstructured(pruning_par, pruning_method=at.ThresholdPruning, threshold=self.threshold)
+        quantW, quantLayer = at.quantRate(self.model, self.alphas)
+ 
+        print("Quant rate: ", quantW, " Layerwise: ", quantLayer)
 
-        spars, tot_p = at.sparsityRate(self.model)
-        
-        #as above
-        # i=0
-        # while i < len(spars):
-        #     print("\n Percentage of pruned entities ", (np.array(spars[i])==1).sum()/np.array(spars[i]).size, "total entities in this layer", np.array(spars[i]).size)
-        #     i=i+1
-        print("\nTotal parameter pruned:", tot_p[0], "(unstructured)", tot_p[1],"(structured)\n")
 
         self.validate()
 
@@ -121,26 +103,6 @@ class Trainer():
     #Finetuning of the pruned model
         print("\n Total elapsed time ", datetime.now()-start,"\n FINETUNING\n")
         self.best_prec1 = 0
-
-        #recovering all pruned weights that are not in a pruned entity
-        for m in self.model.modules():
-            if isinstance(m,torch.nn.Conv2d):
-                for i in range(m.out_channels):
-                        if m.weight_mask[i,:].sum()/m.weight_mask[i,:].numel()>0.05:
-                            m.weight_mask[i,:]=1
-                        else:
-                            m.weight_mask[i,:]=0
-
-        spars, tot_ = at.sparsityRate(self.model)
-        
-        #as above
-        # i=0
-        # while i < len(spars):
-        #     print("\n Percentage of pruned entities ", (np.array(spars[i])==1).sum()/np.array(spars[i]).size, "total entities in this layer", np.array(spars[i]).size)
-        #     i=i+1
-        print("\nTotal parameter pruned:", tot_p[0], "(unstructured)", tot_p[1],"(structured)\n")
-
-        self.validate()
 
 
         for epoch in range(epochs, epochs + finetuning_epochs):
@@ -174,12 +136,9 @@ class Trainer():
         print("\n Elapsed time for training ", datetime.now()-start)
 
 
-        spars, tot_p = at.sparsityRate(self.model)
-        # i=0
-        # while i < len(spars):
-        #     print("\n Percentage of pruned entities ", (np.array(spars[i])==1).sum()/np.array(spars[i]).size, "total entities in this layer", np.array(spars[i]).size)
-        #     i=i+1
-        print("Total parameter pruned:", tot_p[0], "(unstructured)", tot_p[1],"(structured)")
+        quantW, quantLayer = at.quantRate(self.model, self.alphas)
+ 
+        print("Quant rate: ", quantW, " Layerwise: ", quantLayer)
         
         self.validate(reg_on = False)
         print("Best accuracy: ", self.best_prec1)
@@ -217,7 +176,7 @@ class Trainer():
             loss = self.criterion(output, target_var)
             loss_noreg = loss.item()
             if reg_on:
-                loss, regTerm = self.reg(self.model, loss, self.lamb)
+                loss, regTerm = self.reg(self.model, loss, self.lamb, self.gamma)
             else: regTerm = 0.0
 
             # compute gradient and do SGD step
@@ -292,7 +251,7 @@ class Trainer():
                 loss_noreg = loss.item()
 
                 if reg_on:
-                    loss, regTerm = self.reg(self.model, loss, self.lamb)
+                    loss, regTerm = self.reg(self.model, loss, self.lamb, self.gamma)
                 else: regTerm = 0.0
 
                 output = output.float()

@@ -3,7 +3,7 @@ from collections import defaultdict
 import pandas as pd
 
 ########################################################################################
-param_dict= {"lr": "lr", "lambda": "l", "alpha": "a", "epochs": "e", "batch_size": "bs",
+param_dict= {"lr": "lr", "lambda": "l","gamma": "g", "alpha": "a", "epochs": "e", "batch_size": "bs",
              "threshold": "t", "momentum": "m", "weight_decay": "wd", "M_scale": "Mscl"}
 ########################################################################################
 
@@ -42,11 +42,11 @@ def create_csv(path = "logs/resnet20"):
         s = ls[-i].split()
         table_cols["Final_Accuracy"].append(s[2])
 
-        while not('Total parameter pruned:' in ls[-i]):
+        while not('Quant rate:' in ls[-i]):
             i = i+1
 
         s = ls[-i].split()
-        table_cols["Sparsity"].append(int(s[5]))
+        table_cols["Quant_rate"].append(float(s[2]))
 
         while not('Elapsed time' in ls[-i]):
             i = i+1
@@ -80,7 +80,7 @@ def create_csv(path = "logs/resnet20"):
 
         f.close()
 
-
+    #[print(key,len(table_cols[key])) for key in table_cols.keys()]
     table_cols = dict(table_cols)
     table_cols_df = pd.DataFrame(table_cols)
     table_cols_df = table_cols_df.astype({"batch_size": int})
@@ -95,7 +95,7 @@ def write_small_tab(path, name, cols = ["lambda", "alpha", "Final_Accuracy", "Sp
 def take_par_and_val(s):
     for k, v in param_dict.items():
         n = len(v)
-        if s[:n] == v and ((s[n:].replace(".", "")).isnumeric() or (v == "e" and "+" in s[n:])):
+        if s[:n] == v and (s[n:].replace(".", "")).isnumeric() or (s[n:n+3]=="1e-" or (v == "e" and "+" in s[n:])):
             return k, s[n:]
 
     return "not_found", None

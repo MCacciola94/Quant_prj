@@ -3,115 +3,55 @@ from torch.nn.utils import prune
 import torch.nn as nn
 import numpy as np
 
-#Pruning crieterion for unstructured threshold pruning
-class ThresholdPruning(prune.BasePruningMethod):
-    PRUNING_TYPE = "unstructured"
 
-    def __init__(self, threshold):
-        self.threshold = threshold
-
-    def compute_mask(self, tensor, default_mask):
-        return torch.abs(tensor) > self.threshold
 
 
 #Computing sparsity information of the model
-def sparsityRate(model,verb=False,opt="channels"):
+def quantRate(net, alphas, tol=1e-6):
     out=[]
-    tot_pruned=0
-    tot_struct_pruned=0
-    for m in model.modules():
-        #Fully Connected layers
-        if isinstance(m,nn.Linear):
-            v=[]
-            for i in range(m.out_features):
-                el=float((m.weight[i,:]==0).sum()/m.weight[i,:].numel())
-                v=v+[el]
-                tot_pruned+=m.in_features*el
-                if el==1.0:
-                    tot_struct_pruned+=m.in_features
+    quant_weights=0
+    tot = 0 
+    layer_quant = []
+    if "<class 'resnet.ResNet'>"==str(type(net)):
+            inp_layer_name = "conv1"
+    else: inp_layer_name = "None"
+
+    for m in net.modules():
+    #TO DO SKIP THE INPUT LAYER    
+    #Convolutional layers               
+        if isinstance(m,torch.nn.Conv2d) and not(m==getattr(net,inp_layer_name,None)):
+            alpha = alphas[m]
+            b = torch.abs(torch.abs(m.weight)-alpha)<=tol
+            layer_tot  = m.kernel_size[0]*m.kernel_size[1]*m.in_channels*m.out_channels
+        else:
+            continue
+        
+        layer_quant +=  [(b.sum()/layer_tot).item()]
+        tot += layer_tot
+        quant_weights += b.sum()
                     
-                
-            if verb:
-                print("in module ",m,"\n sparsity of  ", v)
-            else:
-                print("\n sparsity of  ", v)
-            out=out+[v]
-
-        #Convolutional layers 
-        if isinstance(m,torch.nn.Conv2d):
-            if opt=="channels":
-                v=[]
-                for i in range(m.out_channels):
-                    el= float((m.weight[i,:,:,:]==0).sum()/m.weight[i,:,:,:].numel())
-                    v=v+[el]
-
-                    tot_pruned+=m.kernel_size[0]*m.kernel_size[1]*m.in_channels*el
-                    if el==1.0:
-                        tot_struct_pruned+=m.kernel_size[0]*m.kernel_size[1]*m.in_channels
-
-                if verb:
-                    print("in module ",m,"\n sparsity of  ", v)
-                else:
-                    print("\n sparsity of  ", v)
-                out=out+[v]
-            else:
-                v=[]
-                for i in range(m.out_channels):
-                    for j in range(m.in_channels):
-                        el= float((m.weight[i,j,:,:]==0).sum()/m.weight[i,j,:,:].numel())
-                        v=v+[el]
-
-                        tot_pruned+=m.kernel_size[0]*m.kernel_size[1]*el
-                        if el==1.0:
-                            tot_struct_pruned+=m.kernel_size[0]*m.kernel_size[1]
-
-                        if verb:
-                            print("\n sparsity of  ", v)
-
-                        out=out+[v]
-
-    return out,(tot_pruned,tot_struct_pruned)
+    
+    return (quant_weights/tot).item(), layer_quant
 
 
-#method that prune neurons of the model based on their sparsity
-def thresholdNeuronPruning(module,mask,threshold=0.95):
+ #Computing sparsity information of the model
+def quantThresholding(net, alphas, threshold):
+    if "<class 'resnet.ResNet'>"==str(type(net)):
+            inp_layer_name = "conv1"
+    else: inp_layer_name = "None"
 
-    #Fully Connected layers
-   if isinstance(module,nn.Linear):
-        for i in range(module.out_features):
-            if float((module.weight[i,:]==0).sum()/module.weight[i,:].numel())>threshold:
-                mask[i]=0
-
-    #Convolutional layers    
-   if isinstance(module,nn.Conv2d):
-        for i in range(module.out_channels):
-            if float((module.weight[i,:,:,:]==0).sum()/module.weight[i,:,:,:].numel())>threshold:
-                mask[i]=0
-            
-   return 1-mask.sum()/mask.numel()            
+    for m in net.modules():
+ 
+    #Convolutional layers               
+        if isinstance(m, torch.nn.Conv2d) and not(m == getattr(net, inp_layer_name ,None)):
+            alpha =alphas[m]
+            b = torch.abs(torch.abs(m.weight) - alpha) <= threshold
+            m.weight = torch.nn.Parameter(b * torch.sign(m.weight) * alpha + torch.logical_not(b) * m.weight)
+        else:
+            continue     
 
 
-# compute the maximum weight for each neuron
-def maxVal(model): 
-    out=[]
-    for m in model.modules():
-          #Fully Connected layers
-          if isinstance(m,nn.Linear):
-                # for i in range(m.out_features):  
-                #     v=v+ [float(torch.norm(m.weight[i,:],np.inf))]
-                v=torch.norm(m.weight,dim=1,p=np.inf)
-          else:
-          #Convolutional layers
-                if isinstance(m,nn.Conv2d):
-                # for i in range(m.out_channels):  
-                #     v=v+[float(torch.norm(m.weight[i,:,:,:],np.inf))]
-                    v=torch.norm(m.weight,dim=(1,2,3),p=np.inf)
-                else:
-                    continue
 
-          print("\nmax weight is ", v)
-          out+=[v]
-    return out
 
 
 def layerwise_M(model, const = False, scale = 1.0):
@@ -126,6 +66,28 @@ def layerwise_M(model, const = False, scale = 1.0):
                     Mdict[m]=torch.norm(m.weight,p=np.inf).item() * scale
 
        return Mdict
+
+
+
+
+def layerwise_alpha(model, const = False, scale = 1.0):
+       Adict={}
+       if "<class 'resnet.ResNet'>"==str(type(model)):
+            inp_layer_name = "conv1"
+       else: inp_layer_name = "None"
+
+       if const:
+           for m in model.modules():
+               
+                if isinstance(m,nn.Conv2d) and not(m == getattr(model, inp_layer_name, None)):
+                    Adict[m]=1e-3
+       else:
+            for m in model.modules():
+                
+                if isinstance(m, nn.Conv2d) and not(m == getattr(model, inp_layer_name, None)):
+                    Adict[m]=torch.mean(torch.abs(m.weight)).item() * scale
+
+       return Adict
 
 def noReg(net, loss, lamb=0.1):
     return loss,0
